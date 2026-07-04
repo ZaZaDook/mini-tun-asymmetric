@@ -4,7 +4,9 @@ A self-written **asymmetric tunnel** and network-research project, built on the
 **BadRouting** protocol. Three roles — **client** (Flutter desktop + Linux CLI),
 **master** (entry + internet egress) and **slave** (return-path downlink) — where the
 uplink and downlink take *different* network paths (hence "Asymmetric"). It's an
-experiment in transport design and traffic-analysis-resistant routing.
+experiment in transport design and traffic-analysis-resistant routing — the kind of
+thing you build to *understand* how networks look at traffic. Purely academic, of
+course. 😉
 
 > [!WARNING]
 > **Early alpha — proof of concept.** This is a working proof of concept, published
@@ -16,7 +18,8 @@ experiment in transport design and traffic-analysis-resistant routing.
 >
 > Use it only on networks and systems you own or are authorized to test, and in
 > accordance with the laws of your jurisdiction. The author provides it as-is, with
-> no warranty, and takes no responsibility for how others use it.
+> no warranty, and takes no responsibility for how others use it. What you take away
+> from the design is entirely up to you. 🙂
 
 ## Highlights
 
@@ -31,7 +34,9 @@ experiment in transport design and traffic-analysis-resistant routing.
 - **Pluggable transport carriers** — every UDP packet is framed according to a
   selectable carrier format; the carrier is chosen per session (client-side
   auto-race + fallback, or manual). An experiment in how interchangeable the
-  on-wire framing of a transport can be:
+  on-wire framing of a transport can be — and, purely coincidentally, in how much
+  a packet on the wire ends up looking like a game session, a torrent, or a video
+  call. 🙃
   - `cs2` — Source Engine / CS2 game datagram framing
   - `utp` — BitTorrent µTP (BEP-29) framing
   - `webrtc` — STUN + RTP framing
@@ -45,7 +50,8 @@ experiment in transport design and traffic-analysis-resistant routing.
   It owns a tagged table and reconciles its own leftovers on startup.
 - **In-tunnel DNS** — a DNS resolver on the gateway plus a client-side DNS
   kill-switch and IPv6 block, so name resolution stays consistent inside the tunnel
-  regardless of the local network's DNS configuration.
+  regardless of whatever *creative* answers the local network might otherwise decide
+  to hand back. 🙂
 - **Authenticated handshake** — the auth token never appears on the wire (HMAC
   over a timestamped nonce); stale/replayed handshakes are rejected silently.
 - **Encryption** — ChaCha20-Poly1305 AEAD, per-session key bound to the tunnel IP.
