@@ -1,0 +1,8 @@
+{
+  "master_control": "MASTER_IP:7001",
+  "listen_udp": "0.0.0.0:7002",
+  "auth_token": "dGhpcyBpcyBhIHNlY3JldCB0b2tlbiBjaGFuZ2UgbWUh",
+  "tls_ca_cert_file": "/etc/mini-tun-asymmetric/tls/ca.crt",
+  "slave_id": "slave01",
+  "log_level": "info"
+}

@@ -1,0 +1,13 @@
+# Normalize line endings: LF in the repo for all text, LF on checkout too.
+# Critical: shell scripts and Go files are deployed to Linux servers — CRLF breaks them.
+* text=auto eol=lf
+
+# Windows-only scripts keep CRLF
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+
+# Binary assets — never touch
+*.dll binary
+*.ico binary
+*.png binary
+*.exe binary

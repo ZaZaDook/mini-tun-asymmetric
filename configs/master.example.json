@@ -1,0 +1,13 @@
+{
+  "listen_udp": "0.0.0.0:7000",
+  "listen_control": "0.0.0.0:7001",
+  "tunnel_subnet": "10.8.0.0/24",
+  "tunnel_ip": "10.8.0.1",
+  "auth_token": "dGhpcyBpcyBhIHNlY3JldCB0b2tlbiBjaGFuZ2UgbWUh",
+  "server_id": "master01",
+  "tls_cert_file": "/etc/mini-tun-asymmetric/tls/master.crt",
+  "tls_key_file": "/etc/mini-tun-asymmetric/tls/master.key",
+  "dns_upstream": "8.8.8.8:53",
+  "log_level": "info",
+  "slaves": []
+}

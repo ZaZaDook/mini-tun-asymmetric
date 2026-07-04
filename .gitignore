@@ -1,0 +1,57 @@
+# Secrets — never commit
+*.mini-tun-asymmetric_token
+.mini-tun-asymmetric_token
+*token*.txt
+newtoken.txt
+/etc/mini-tun-asymmetric/*.json
+*.pem
+*.key
+*.crt
+
+# TLS / cert material
+tls/
+certs/
+
+# Build output
+/dist/mini-tun-asymmetric-master
+/dist/mini-tun-asymmetric-slave
+/dist/mini-tun-asymmetric-cli
+/dist/mini-tun-asymmetric-tui
+/dist/dpt
+/dist/Mini-Tun Asymmetric.exe
+*.exe
+*.test
+*.out
+
+# Local agent / editor settings
+.claude/settings.local.json
+.idea/
+.vscode/
+
+# OS noise
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Internal dev journal / transcripts / diagnostics — keep out of the repo
+contextfile.txt
+FixUI.txt
+dist/vpndiag-out.txt
+HHHHHH*
+
+# Agent / editor settings (whole dir)
+.claude/
+
+# Flutter migration (Phase 0+)
+build-mobile/
+client-flutter/build/
+client-flutter/.dart_tool/
+client-flutter/.flutter-plugins*
+client-flutter/windows/flutter/ephemeral/
+client-flutter/android/.gradle/
+client-flutter/android/local.properties
+*.aar
+dist/flutter-app*/
+dist/mini-tun-asymmetric-agent.exe
