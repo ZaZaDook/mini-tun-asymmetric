@@ -109,6 +109,14 @@ selection, nft-backed dynamic firewall, Flutter desktop client.
 Roadmap: graceful-shutdown audit, raw (plain) carrier, IPv6 data-path,
 Noise/mTLS authentication, Android release.
 
+## Authorship
+
+The **architecture, design decisions, and ideas** are human. **100% of the code**
+was written by an AI — Claude Opus 4.8 (Anthropic). This split is deliberate: a
+human drove *what* to build and *why*, the model produced *how*. (Naming the tool
+is just attribution — it doesn't imply Anthropic endorses or is affiliated with
+this project.)
+
 ---
 
 # Mini-Tun Asymmetric — русская версия
@@ -222,4 +230,11 @@ Flutter-клиент собирается через Flutter SDK (`flutter build
 ближайшего узла, динамический фаервол на nft, десктопный Flutter-клиент.
 Планы: аудит graceful-shutdown, raw (plain) носитель, IPv6 в data-path,
 аутентификация Noise/mTLS, релиз под Android.
+
+## Авторство
+
+**Архитектура, проектные решения и идеи** — человек. **100% кода** написано ИИ —
+Claude Opus 4.8 (Anthropic). Разделение намеренное: человек задавал *что* строить
+и *зачем*, модель выдавала *как*. (Упоминание инструмента — это просто указание
+авторства; оно не означает, что Anthropic одобряет проект или связан с ним.)
 
