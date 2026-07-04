@@ -4,9 +4,21 @@ A self-written **asymmetric tunnel** and network-research project, built on the
 **BadRouting** protocol. Three roles — **client** (Flutter desktop + Linux CLI),
 **master** (entry + internet egress) and **slave** (return-path downlink) — where the
 uplink and downlink take *different* network paths (hence "Asymmetric"). It's an
-experiment in transport design and traffic-analysis-resistant routing — the kind of
-thing you build to *understand* how networks look at traffic. Purely academic, of
-course. 😉
+experiment in split-path transport and flow separation — the kind of thing you build
+to *understand* how networks look at traffic. Purely academic, of course. 😉
+
+```
+                 uplink
+   Client ----------------> Master ----> internet
+      ^                       |
+      |                       |
+      +------- Slave <--------+
+             downlink
+```
+
+Uplink and downlink never share a path: the client sends *to* the master, but
+receives *from* a slave. The two directions are separate flows on separate hops —
+that's the whole idea.
 
 > [!WARNING]
 > **Early alpha — proof of concept.** This is a working proof of concept, published
@@ -25,8 +37,8 @@ course. 😉
 
 - **Asymmetric routing** — uplink `client → master`, downlink `master → slave → client`
   via UDP NAT hole-punching. The return path leaves from a *different* IP than the
-  entry, so uplink and downlink don't share an observable flow — the core research
-  idea of the project.
+  entry, so the two directions are separate flows rather than one bidirectional
+  session — the core research idea of the project.
 - **Nearest-node selection** — the master hands the client the full list of live
   slaves; the client RTT-probes each (authenticated ping/pong) and pins the closest
   for its downlink, cutting the latency of the triple-hop path. Falls back to
