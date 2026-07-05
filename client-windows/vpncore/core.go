@@ -637,8 +637,15 @@ func (e *Engine) bringUp(res *handshakeResult) error {
 
 		// Install full-tunnel routing (all IPv4 traffic via VPN, VPN servers
 		// excluded). setupRouting owns the IPv4 split routes on both platforms.
+		// Exclude the master AND every slave the master may steer us to: the
+		// round-robin SlaveIP plus all Welcome-v3 candidates. Missing a candidate
+		// means its RTT probe (and, if pinned, its downlink) would route back into
+		// the tunnel and be black-holed — silently degrading nearest-node to the
+		// round-robin pick.
 		if e.FullTunnel {
-			cleanup := e.setupRouting(mAddr.IP, welcome.SlaveIP)
+			excludeIPs := dedupeIPs(append([]net.IP{mAddr.IP, welcome.SlaveIP},
+				slaveEndpointIPs(welcome.Slaves)...))
+			cleanup := e.setupRouting(excludeIPs...)
 			e.mu.Lock()
 			e.routeCleanup = cleanup
 			e.mu.Unlock()
@@ -830,6 +837,36 @@ func (e *Engine) probeAndChooseSlave(stop <-chan struct{}, slaveConn *net.UDPCon
 	// Keep the NAT mapping to the chosen slave warm immediately.
 	punch := tr.Wrap(protocol.PktTypePunch, welcome.AssignedIP.To4())
 	slaveConn.WriteToUDP(punch, best.addr)
+}
+
+// slaveEndpointIPs extracts the IPs from a Welcome-v3 candidate slave list.
+func slaveEndpointIPs(slaves []protocol.SlaveEndpoint) []net.IP {
+	ips := make([]net.IP, 0, len(slaves))
+	for _, s := range slaves {
+		if s.IP != nil {
+			ips = append(ips, s.IP)
+		}
+	}
+	return ips
+}
+
+// dedupeIPs returns the input with nil and duplicate addresses removed,
+// preserving order. Used to build the full-tunnel route-exclusion set.
+func dedupeIPs(ips []net.IP) []net.IP {
+	seen := make(map[string]bool, len(ips))
+	out := make([]net.IP, 0, len(ips))
+	for _, ip := range ips {
+		if ip == nil {
+			continue
+		}
+		k := ip.String()
+		if seen[k] {
+			continue
+		}
+		seen[k] = true
+		out = append(out, ip)
+	}
+	return out
 }
 
 // slavePunchLoop periodically sends a punch packet from the downlink socket to
