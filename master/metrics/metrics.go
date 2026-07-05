@@ -24,6 +24,7 @@ type Counters struct {
 	DNSErrors       atomic.Uint64
 	ClientPackets   atomic.Uint64 // decrypted client→net packets injected
 	BytesUplink     atomic.Uint64 // bytes received from clients (pre-decrypt payloads)
+	SpoofedSrc      atomic.Uint64 // decrypted packets dropped: inner src != session tunnel IP (reverse-path filter)
 }
 
 // SlaveStat is a point-in-time view of one slave's health for failover decisions.
@@ -45,6 +46,7 @@ type Snapshot struct {
 	DNSErrors       uint64      `json:"dns_errors"`
 	ClientPackets   uint64      `json:"client_packets"`
 	BytesUplink     uint64      `json:"bytes_uplink"`
+	SpoofedSrc      uint64      `json:"spoofed_src"`
 	Slaves          []SlaveStat `json:"slaves"`
 }
 
@@ -90,6 +92,7 @@ func (r *Registry) Snapshot(now time.Time) Snapshot {
 		DNSErrors:       r.C.DNSErrors.Load(),
 		ClientPackets:   r.C.ClientPackets.Load(),
 		BytesUplink:     r.C.BytesUplink.Load(),
+		SpoofedSrc:      r.C.SpoofedSrc.Load(),
 		Slaves:          slaves,
 	}
 }

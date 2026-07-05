@@ -2,9 +2,32 @@
 package config
 
 import (
+	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"os"
 )
+
+// minTokenBytes is the minimum decoded auth-token length. A short or empty token
+// yields a predictable HMAC key and predictable derived master/session keys, so
+// the master and slave refuse to start without a real one. 16 bytes = 128 bits.
+const minTokenBytes = 16
+
+// validateToken rejects empty/short/undecodable auth tokens. The token is a
+// base64 string; we check the DECODED length.
+func validateToken(tok string) error {
+	if tok == "" {
+		return fmt.Errorf("auth_token is empty")
+	}
+	raw, err := base64.StdEncoding.DecodeString(tok)
+	if err != nil {
+		return fmt.Errorf("auth_token is not valid base64: %w", err)
+	}
+	if len(raw) < minTokenBytes {
+		return fmt.Errorf("auth_token too short: %d bytes decoded, need >= %d", len(raw), minTokenBytes)
+	}
+	return nil
+}
 
 // MasterConfig is the configuration file for the Master Node.
 type MasterConfig struct {
@@ -126,7 +149,13 @@ func LoadMasterConfig(path string) (*MasterConfig, error) {
 	}
 	defer f.Close()
 	var c MasterConfig
-	return &c, json.NewDecoder(f).Decode(&c)
+	if err := json.NewDecoder(f).Decode(&c); err != nil {
+		return nil, err
+	}
+	if err := validateToken(c.AuthToken); err != nil {
+		return nil, err
+	}
+	return &c, nil
 }
 
 func LoadSlaveConfig(path string) (*SlaveConfig, error) {
@@ -136,7 +165,13 @@ func LoadSlaveConfig(path string) (*SlaveConfig, error) {
 	}
 	defer f.Close()
 	var c SlaveConfig
-	return &c, json.NewDecoder(f).Decode(&c)
+	if err := json.NewDecoder(f).Decode(&c); err != nil {
+		return nil, err
+	}
+	if err := validateToken(c.AuthToken); err != nil {
+		return nil, err
+	}
+	return &c, nil
 }
 
 func LoadClientConfig(path string) (*ClientConfig, error) {
@@ -153,7 +188,10 @@ func LoadClientConfig(path string) (*ClientConfig, error) {
 }
 
 func SaveClientConfig(path string, c *ClientConfig) error {
-	f, err := os.Create(path)
+	// 0600: the client config holds the auth token. On POSIX os.Create would use
+	// 0666&umask (often 0644, world-readable); force owner-only. On Windows the
+	// perm is advisory (AppData is ACL-protected), so this is harmless there.
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
 		return err
 	}

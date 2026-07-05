@@ -2,9 +2,9 @@ GOOS_LINUX  := GOOS=linux GOARCH=amd64
 GOOS_WIN    := GOOS=windows GOARCH=amd64
 OUT         := ./dist
 
-.PHONY: all master slave client-windows server-tui cli clean tls
+.PHONY: all master slave agent server-tui cli clean tls
 
-all: master slave client-windows server-tui cli
+all: master slave agent server-tui cli
 
 master:
 	mkdir -p $(OUT)
@@ -14,9 +14,12 @@ slave:
 	mkdir -p $(OUT)
 	$(GOOS_LINUX) go build -o $(OUT)/mini-tun-asymmetric-slave ./slave/
 
-client-windows:
+# The Windows GUI is the Flutter app in client-flutter/ (built with
+# `flutter build windows`). The Go side is the privileged sidecar the GUI drives
+# over loopback; build it here. The Flutter GUI links against client-windows/vpncore.
+agent:
 	mkdir -p $(OUT)
-	$(GOOS_WIN) go build -ldflags="-H windowsgui" -o "$(OUT)/Mini-Tun Asymmetric.exe" ./client-windows/
+	$(GOOS_WIN) go build -ldflags="-H=windowsgui -s -w" -o "$(OUT)/mini-tun-asymmetric-agent.exe" ./cmd/mini-tun-asymmetric-agent/
 
 server-tui:
 	mkdir -p $(OUT)

@@ -336,6 +336,24 @@ type pktServer struct {
 	uplinkAEADs map[string]*crypto.AEAD
 }
 
+// srcMatchesTunnel reports whether a decrypted client IP packet's source address
+// equals the session's assigned tunnel IP (reverse-path filter). Without this an
+// authenticated client could spoof another session's tunnel IP as the inner src,
+// so the master's reply traffic for that flow would be delivered to the spoofed
+// IP's owner. Only IPv4 is checked (data-path is IPv4-only); non-IPv4 or truncated
+// packets are rejected. ipPkt is a raw IPv4 packet: src address is bytes [12:16].
+func srcMatchesTunnel(ipPkt []byte, tunnelIP net.IP) bool {
+	if len(ipPkt) < 20 || ipPkt[0]>>4 != 4 {
+		return false
+	}
+	want := tunnelIP.To4()
+	if want == nil {
+		return false
+	}
+	src := ipPkt[12:16]
+	return src[0] == want[0] && src[1] == want[1] && src[2] == want[2] && src[3] == want[3]
+}
+
 // handleUplink processes a client uplink packet relayed by a slave (QUIC symmetric
 // mode). The payload is still encrypted with the per-session key; we decrypt it
 // and inject it into the gVisor stack, exactly as the direct uplink path does.
@@ -361,6 +379,10 @@ func (s *pktServer) handleUplink(tunnelIP net.IP, clientCiphertext []byte) {
 
 	ipPkt, err := aead.Open(clientCiphertext)
 	if err != nil {
+		return
+	}
+	if !srcMatchesTunnel(ipPkt, tunnelIP) {
+		s.mreg.C.SpoofedSrc.Add(1)
 		return
 	}
 	s.mreg.C.ClientPackets.Add(1)
@@ -401,6 +423,10 @@ func (s *pktServer) serve(conn *net.UDPConn, tr transport.Transport, acceptHands
 			}
 			ipPkt, err := aead.Open(rawPayload)
 			if err != nil {
+				continue
+			}
+			if !srcMatchesTunnel(ipPkt, sess.TunnelIP) {
+				s.mreg.C.SpoofedSrc.Add(1)
 				continue
 			}
 			s.mreg.C.ClientPackets.Add(1)
@@ -473,6 +499,10 @@ func (s *pktServer) serveData(conn *net.UDPConn, tr transport.Transport, sess *s
 			sess.Touch()
 			ipPkt, err := aead.Open(rawPayload)
 			if err != nil {
+				continue
+			}
+			if !srcMatchesTunnel(ipPkt, sess.TunnelIP) {
+				s.mreg.C.SpoofedSrc.Add(1)
 				continue
 			}
 			s.mreg.C.ClientPackets.Add(1)
