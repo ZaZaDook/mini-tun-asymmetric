@@ -3,6 +3,7 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
 	"os"
 	"os/exec"
@@ -25,7 +26,17 @@ var (
 	pages *tview.Pages
 )
 
+// version is set at build time via -ldflags "-X main.version=$(cat VERSION)".
+var version = "dev"
+
 func main() {
+	showVersion := flag.Bool("version", false, "print version and exit")
+	flag.Parse()
+	if *showVersion {
+		fmt.Println("mta-setup", version)
+		return
+	}
+
 	app = tview.NewApplication()
 	pages = tview.NewPages()
 
@@ -41,6 +52,7 @@ func main() {
 
 func showMainMenu() {
 	menu := tview.NewList().
+		AddItem("Quick Setup Wizard", "First-run: pick role, generate token, install & start", 'w', func() { showWizard() }).
 		AddItem("Master Node", "Configure and manage the Master node", 'm', func() { showMasterMenu() }).
 		AddItem("Slave Node", "Configure and manage the Slave node", 's', func() { showSlaveMenu() }).
 		AddItem("Status", "View running service status", 't', func() { showStatus() }).
@@ -116,7 +128,8 @@ func showMasterConfigForm() {
 
 func saveMasterConfig(cfg *config.MasterConfig) error {
 	os.MkdirAll(filepath.Dir(masterCfgPath), 0750)
-	f, err := os.Create(masterCfgPath)
+	// 0600: the config holds the auth token.
+	f, err := os.OpenFile(masterCfgPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
 		return err
 	}
@@ -174,7 +187,8 @@ func showSlaveConfigForm() {
 
 func saveSlaveConfig(cfg *config.SlaveConfig) error {
 	os.MkdirAll(filepath.Dir(slaveCfgPath), 0750)
-	f, err := os.Create(slaveCfgPath)
+	// 0600: the config holds the auth token.
+	f, err := os.OpenFile(slaveCfgPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
 		return err
 	}

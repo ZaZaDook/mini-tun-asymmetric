@@ -26,6 +26,9 @@ import (
 	"github.com/ZaZaDook/mini-tun-asymmetric/client-windows/vpncore"
 )
 
+// version is set at build time via -ldflags "-X main.version=$(cat VERSION)".
+var version = "dev"
+
 func main() {
 	master := flag.String("master", "", "master address host:port (UDP)")
 	token := flag.String("token", "", "base64 auth token")
@@ -35,7 +38,13 @@ func main() {
 	tr := flag.String("transport", "", "transport carrier: cs2 (default) | utp | webrtc | quic | auto")
 	debug := flag.Bool("debug", false, "verbose data-path logging")
 	wait := flag.Duration("wait", 0, "auto-disconnect after this duration (0 = run until Ctrl-C)")
+	showVersion := flag.Bool("version", false, "print version and exit")
 	flag.Parse()
+
+	if *showVersion {
+		fmt.Println("mini-tun-asymmetric-cli", version)
+		return
+	}
 
 	if *master == "" || *token == "" {
 		fmt.Fprintln(os.Stderr, "usage: mini-tun-asymmetric-cli -master host:port -token <base64> [-full | -route IP] [-debug] [-wait 30s]")

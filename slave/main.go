@@ -11,6 +11,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"flag"
+	"fmt"
 	"io"
 	"log"
 	"math/big"
@@ -83,10 +84,19 @@ func (s *slaveServer) relayToMaster(tunnelIP net.IP, clientCiphertext []byte) {
 	s.relayConn.WriteToUDP(frame, s.masterDP)
 }
 
+// version is set at build time via -ldflags "-X main.version=$(cat VERSION)".
+var version = "dev"
+
 func main() {
 	cfgPath := flag.String("config", "/etc/mini-tun-asymmetric/slave.json", "path to slave config")
 	genConfig := flag.Bool("gen-config", false, "write a default config to stdout and exit")
+	showVersion := flag.Bool("version", false, "print version and exit")
 	flag.Parse()
+
+	if *showVersion {
+		fmt.Println("mini-tun-asymmetric-slave", version)
+		return
+	}
 
 	if *genConfig {
 		cfg := config.DefaultSlaveConfig()

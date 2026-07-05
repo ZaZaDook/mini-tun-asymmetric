@@ -8,6 +8,7 @@ package main
 import (
 	"encoding/json"
 	"flag"
+	"fmt"
 	"io"
 	"log"
 	"os"
@@ -22,6 +23,9 @@ import (
 
 const appName = "Mini-Tun Asymmetric Agent"
 
+// version is set at build time via -ldflags "-X main.version=$(cat VERSION)".
+var version = "dev"
+
 func appDataDir() string {
 	base, _ := os.UserConfigDir()
 	return filepath.Join(base, "MiniTunAsymmetric")
@@ -29,7 +33,13 @@ func appDataDir() string {
 
 func main() {
 	ownerPID := flag.Int("owner-pid", 0, "exit when this process (the GUI) is gone")
+	showVersion := flag.Bool("version", false, "print version and exit")
 	flag.Parse()
+
+	if *showVersion {
+		fmt.Println("mini-tun-asymmetric-agent", version)
+		return
+	}
 
 	// TUN + routing need Administrator. Relaunch with a UAC prompt if needed.
 	if runtime.GOOS == "windows" && !isAdmin() {

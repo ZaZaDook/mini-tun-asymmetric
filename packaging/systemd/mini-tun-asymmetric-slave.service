@@ -1,0 +1,14 @@
+[Unit]
+Description=Mini-Tun Asymmetric Slave Node
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/mini-tun-asymmetric-slave -config /etc/mini-tun-asymmetric/slave.json
+Restart=always
+RestartSec=5
+LimitNOFILE=65536
+AmbientCapabilities=CAP_NET_ADMIN
+
+[Install]
+WantedBy=multi-user.target

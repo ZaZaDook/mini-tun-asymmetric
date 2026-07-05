@@ -1,0 +1,68 @@
+# nfpm config — builds the Mini-Tun Asymmetric server package (.deb and .rpm).
+# One package ships both roles (master + slave) + the mta-setup wizard; the role
+# is chosen post-install with `mta-setup`.
+#
+# Binaries must be built into dist/ first (see packaging/build.sh or `make packages`):
+#   dist/mini-tun-asymmetric-master, dist/mini-tun-asymmetric-slave, dist/mta-setup
+#
+# VERSION is taken from the env var (packaging/build.sh sets it from the VERSION file).
+name: mini-tun-asymmetric
+arch: amd64
+platform: linux
+version: ${VERSION}
+section: net
+priority: optional
+maintainer: ZaZaDook <noreply@users.noreply.github.com>
+description: |
+  Mini-Tun Asymmetric — split-path UDP tunnel (BadRouting protocol).
+  One package, two roles: master (entry + egress) and slave (downlink relay).
+  Choose the role after install with `mta-setup`.
+homepage: https://github.com/ZaZaDook/mini-tun-asymmetric
+license: "See project README (early-alpha, unaudited)"
+
+contents:
+  - src: dist/mini-tun-asymmetric-master
+    dst: /usr/bin/mini-tun-asymmetric-master
+    file_info:
+      mode: 0755
+  - src: dist/mini-tun-asymmetric-slave
+    dst: /usr/bin/mini-tun-asymmetric-slave
+    file_info:
+      mode: 0755
+  - src: dist/mta-setup
+    dst: /usr/bin/mta-setup
+    file_info:
+      mode: 0755
+  - src: packaging/systemd/mini-tun-asymmetric-master.service
+    dst: /usr/lib/systemd/system/mini-tun-asymmetric-master.service
+    file_info:
+      mode: 0644
+  - src: packaging/systemd/mini-tun-asymmetric-slave.service
+    dst: /usr/lib/systemd/system/mini-tun-asymmetric-slave.service
+    file_info:
+      mode: 0644
+  - src: packaging/README.package.txt
+    dst: /usr/share/doc/mini-tun-asymmetric/README
+    file_info:
+      mode: 0644
+  # Config directory, owned by the package, populated by mta-setup.
+  - dst: /etc/mini-tun-asymmetric
+    type: dir
+    file_info:
+      mode: 0750
+
+scripts:
+  postinstall: packaging/scripts/postinstall.sh
+  preremove: packaging/scripts/preremove.sh
+  postremove: packaging/scripts/postremove.sh
+
+# firewalld/nft is optional at package level — mta-setup opens ports at runtime
+# via firewall-cmd/ufw if present. No hard dependency so cloud images without a
+# local firewall (filtered by the provider SG) still install cleanly.
+overrides:
+  rpm:
+    depends:
+      - systemd
+  deb:
+    depends:
+      - systemd

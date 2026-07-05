@@ -29,10 +29,19 @@ import (
 	"github.com/ZaZaDook/mini-tun-asymmetric/master/session"
 )
 
+// version is set at build time via -ldflags "-X main.version=$(cat VERSION)".
+var version = "dev"
+
 func main() {
 	cfgPath := flag.String("config", "/etc/mini-tun-asymmetric/master.json", "path to master config")
 	genConfig := flag.Bool("gen-config", false, "write a default config to stdout and exit")
+	showVersion := flag.Bool("version", false, "print version and exit")
 	flag.Parse()
+
+	if *showVersion {
+		fmt.Println("mini-tun-asymmetric-master", version)
+		return
+	}
 
 	if *genConfig {
 		cfg := config.DefaultMasterConfig()

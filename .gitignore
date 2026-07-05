@@ -17,11 +17,17 @@ certs/
 /dist/mini-tun-asymmetric-slave
 /dist/mini-tun-asymmetric-cli
 /dist/mini-tun-asymmetric-tui
+/dist/mta-setup
 /dist/dpt
 /dist/Mini-Tun Asymmetric.exe
 *.exe
 *.test
 *.out
+
+# Packaging artifacts (built by packaging/*.sh)
+/dist/packages/
+*.deb
+*.rpm
 
 # Local agent / editor settings
 .claude/settings.local.json
@@ -58,3 +64,4 @@ client-flutter/android/local.properties
 *.aar
 dist/flutter-app*/
 dist/mini-tun-asymmetric-agent.exe
+wireshark-filters.txt
