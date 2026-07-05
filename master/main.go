@@ -78,9 +78,10 @@ func main() {
 	// allocates IPv6 lazily (IPv6 phase 1).
 	ipPool := session.NewIPPool(subnet, gatewayIP)
 	sessions := session.NewTable()
-	// Return a session's tunnel IP to the pool when the session is reaped —
-	// without this the pool leaks one address per session and exhausts.
-	sessions.OnRemove = func(s *session.Session) { ipPool.Release(s.TunnelIP) }
+	// The reaper-removal hook (ipPool release, socket/fd close, crypto cleanup,
+	// metric decrement) is installed once below, after srv/fw exist — see
+	// sessions.OnRemove near dp.OnUplink. A single hook avoids the earlier bug
+	// where a second assignment silently overwrote the first.
 
 	// Master key derived from auth token (used for data plane encryption)
 	masterKey := crypto.DeriveKey(tokenBytes, []byte("master-data-plane"))
@@ -231,6 +232,19 @@ func main() {
 		// address, else clientCryptos grows by one AEAD per handshake forever.
 		if s.ClientAddr != nil {
 			srv.clientCryptos.Delete(s.ClientAddr.String())
+		}
+		// Keep the active-sessions gauge honest: it was only ever set at
+		// handshake, so a reaped session left it stale (showed sessions alive
+		// long after they were gone). Reflect the real table size on removal.
+		srv.mreg.C.SessionsActive.Store(int64(sessions.Len()))
+		// Tell every slave the session is over. The session is registered on all
+		// slaves at handshake (SendSession), but slaves have no reaper of their
+		// own — without this SessionEnd they keep the client's downlink address
+		// forever and keep sending to it after the client is gone, which the
+		// dead client's OS answers with ICMP port-unreachable (the "pings after
+		// close" leak). SendSessionEnd was defined but never called until now.
+		for _, sc := range srv.ctrlSrv.Registry.All() {
+			sc.SendSessionEnd(s.ID)
 		}
 	}
 
