@@ -5,6 +5,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/base64"
+	"encoding/json"
 	"encoding/pem"
 	"fmt"
 	"math/big"
@@ -26,6 +27,96 @@ import (
 
 const tlsDir = "/etc/mini-tun-asymmetric/tls"
 
+// showJoinInfo reveals the master's auth token (in the clear — the operator
+// needs it to enrol slaves and clients) plus a copy-paste recipe for adding a
+// slave. This is the answer to "where do I find the token to connect a slave?".
+func showJoinInfo() {
+	cfg := config.DefaultMasterConfig()
+	data, err := os.ReadFile(masterCfgPath)
+	if err != nil {
+		showMessage("No master config",
+			"master.json not found at "+masterCfgPath+
+				"\n\nRun the Quick Setup Wizard → Master first.")
+		return
+	}
+	if err := json.Unmarshal(data, cfg); err != nil {
+		showMessage("Error", "could not parse master.json: "+err.Error())
+		return
+	}
+	if cfg.AuthToken == "" {
+		showMessage("No token", "master.json has no auth_token. Re-run the wizard.")
+		return
+	}
+	host := detectPublicIP()
+	ctrlPort := portOf(cfg.ListenControl)
+	if ctrlPort == "" {
+		ctrlPort = "7001"
+	}
+	// The carrier the master actually listens for (from control_ports, else the
+	// single Transport). Slaves and clients must match this.
+	carrier := cfg.Transport
+	if len(cfg.ControlPorts) > 0 && cfg.ControlPorts[0].Transport != "" {
+		carrier = cfg.ControlPorts[0].Transport
+	}
+	if carrier == "" {
+		carrier = "cs2"
+	}
+
+	// Write the token to a 0600 file so the operator can copy it off the box
+	// (cat / scp) — selecting text in a TUI over SSH is painful, and the token
+	// field is masked in Edit Config.
+	tokenFile := filepath.Join(filepath.Dir(masterCfgPath), "token.txt")
+	tokenHint := ""
+	if err := os.WriteFile(tokenFile, []byte(cfg.AuthToken+"\n"), 0600); err == nil {
+		tokenHint = "\n[yellow]Copy the token off this server:[-]\n" +
+			"  [white]cat " + tokenFile + "[-]\n"
+	}
+
+	info := fmt.Sprintf(
+		"[yellow]Auth token[-] (shared secret — same for master, slaves, clients):\n"+
+			"  [white]%s[-]\n"+
+			"%s\n"+
+			"[yellow]This master:[-]  %s   [gray](control %s, transport %s)[-]\n\n"+
+			"[yellow]To add a SLAVE node:[-]\n"+
+			"  1. [white]sudo dnf install ./mini-tun-asymmetric-*.rpm[-]\n"+
+			"  2. [white]sudo mta-setup[-]  →  Quick Setup Wizard  →  Slave\n"+
+			"  3. Master host:  [white]%s[-]\n"+
+			"     Auth token:   the token above\n"+
+			"     Slave ID:     a unique name (slave01, slave02, ...)\n"+
+			"     Transport:    [white]%s[-]   (MUST match this master)\n"+
+			"  4. Install & Start.\n\n"+
+			"[yellow]To connect a CLIENT:[-] host %s, the same token, transport [white]%s[-].\n\n"+
+			"Verify a slave attached (here on the master):\n"+
+			"  [white]journalctl -u mini-tun-asymmetric-master | grep 'slave registered'[-]",
+		cfg.AuthToken, tokenHint, host, ctrlPort, carrier, host, carrier, host, carrier)
+
+	tv := tview.NewTextView().SetDynamicColors(true).SetWrap(true).
+		SetText("\n  " + strings.ReplaceAll(info, "\n", "\n  "))
+	tv.SetBorder(true).SetTitle(" Join Info — connect a slave / client ").
+		SetBorderColor(tcell.ColorDarkCyan)
+	tv.SetScrollable(true)
+	back := tview.NewButton("[ Back ]").SetSelectedFunc(func() { goPage("master_menu") })
+	flex := tview.NewFlex().SetDirection(tview.FlexRow).
+		AddItem(tv, 0, 1, false).
+		AddItem(back, 3, 0, true)
+	addPage("joininfo", centered(flex, 78, 22), back)
+	goPage("joininfo")
+}
+
+// detectPublicIP returns the host's primary outbound IPv4 by opening a UDP
+// socket to a public address (no packets are sent). Falls back to a placeholder.
+func detectPublicIP() string {
+	c, err := net.Dial("udp", "1.1.1.1:80")
+	if err != nil {
+		return "<this-server-ip>"
+	}
+	defer c.Close()
+	if la, ok := c.LocalAddr().(*net.UDPAddr); ok {
+		return la.IP.String()
+	}
+	return "<this-server-ip>"
+}
+
 // showWizard is the first-run guided setup: pick a role, then fill the minimum
 // fields, and the wizard generates the token/TLS, writes the config, opens the
 // firewall, and enables+starts the service. Existing menus stay for management.
@@ -33,23 +124,32 @@ func showWizard() {
 	menu := tview.NewList().
 		AddItem("Master Node", "This server is the entry + internet egress", 'm', wizardMaster).
 		AddItem("Slave Node", "This server relays downlink to clients", 's', wizardSlave).
-		AddItem("← Back", "", 'b', func() { pages.SwitchToPage("main") })
+		AddItem("← Back", "", 'b', func() { goPage("main") })
 	menu.SetBorder(true).SetTitle(" Quick Setup — choose role ").SetTitleAlign(tview.AlignCenter).
 		SetBorderColor(tcell.ColorDarkCyan)
 	menu.SetSelectedBackgroundColor(tcell.ColorDarkCyan)
-	pages.AddPage("wizard", centered(menu, 64, 10), true, true)
-	pages.SwitchToPage("wizard")
+	addPage("wizard", centered(menu, 64, 10), menu)
+	goPage("wizard")
 }
 
 // ── Master wizard ────────────────────────────────────────────────────────────
 
+// carrierPort maps a transport carrier to its conventional control port. The
+// master, slaves, and clients MUST agree on the carrier — the client dials this
+// port for the chosen carrier, so the master has to listen for it here.
+var carrierPort = map[string]int{
+	"utp":    6881,
+	"cs2":    7000,
+	"webrtc": 3478,
+	"quic":   443,
+}
+
+// carrierOrder is the selectable list; utp is the default (torrent mimicry,
+// asymmetry-friendly) and what the slave/client wizards default to.
+var carrierOrder = []string{"utp", "cs2", "webrtc", "quic"}
+
 func wizardMaster() {
 	cfg := config.DefaultMasterConfig()
-	// Sensible fresh-install defaults (single control port on the classic UDP
-	// port; multi-carrier control_ports can be added later by editing the config).
-	if cfg.ListenUDP == "" {
-		cfg.ListenUDP = "0.0.0.0:7000"
-	}
 	if cfg.ListenControl == "" {
 		cfg.ListenControl = "0.0.0.0:7001"
 	}
@@ -61,6 +161,7 @@ func wizardMaster() {
 	}
 	cfg.TLSCertFile = filepath.Join(tlsDir, "fullchain.pem")
 	cfg.TLSKeyFile = filepath.Join(tlsDir, "privkey.pem")
+	carrier := "utp" // default; must match the slaves and clients
 
 	tokenField := tview.NewInputField().SetLabel("Auth Token (base64)").SetText(cfg.AuthToken).SetFieldWidth(48)
 
@@ -74,31 +175,42 @@ func wizardMaster() {
 			}
 			tokenField.SetText(t)
 		}).
+		AddDropDown("Transport (must match slaves+clients)", carrierOrder, 0, func(opt string, _ int) {
+			carrier = opt
+		}).
 		AddInputField("Server ID", cfg.ServerID, 16, nil, func(v string) { cfg.ServerID = v }).
-		AddInputField("Control port (TCP)", cfg.ListenControl, 20, nil, func(v string) { cfg.ListenControl = v }).
 		AddButton("Install & Start", func() {
 			cfg.AuthToken = strings.TrimSpace(tokenField.GetText())
 			if err := validateTokenLen(cfg.AuthToken); err != nil {
 				showMessage("Error", err.Error())
 				return
 			}
-			steps, err := runMasterInstall(cfg)
+			// Configure the master to listen for the chosen carrier on its
+			// conventional port (control_ports demuxes carrier by arrival port).
+			port := carrierPort[carrier]
+			cfg.ControlPorts = []config.ControlPort{{Port: port, Transport: carrier}}
+			cfg.ListenUDP = fmt.Sprintf("0.0.0.0:%d", port)
+			cfg.Transport = carrier
+			steps, err := runMasterInstall(cfg, carrier, port)
 			if err != nil {
 				showMessage("Setup failed", steps+"\n[red]"+err.Error()+"[-]")
 				return
 			}
 			showMessage("Master ready", steps+
-				"\n[yellow]Share this token with slaves and clients:[-]\n  "+cfg.AuthToken)
+				fmt.Sprintf("\n[yellow]Transport:[-] %s (port %d)\n", carrier, port)+
+				"[yellow]Share this token with slaves and clients:[-]\n  "+cfg.AuthToken+
+				"\n\n[gray]Slaves & clients must use the SAME transport ("+carrier+").[-]")
 		}).
-		AddButton("Cancel", func() { pages.SwitchToPage("wizard") })
+		AddButton("Cancel", func() { goPage("wizard") })
 
 	form.SetBorder(true).SetTitle(" Master Quick Setup ").SetBorderColor(tcell.ColorDarkCyan)
-	pages.AddPage("wiz_master", flex100(form), true, true)
-	pages.SwitchToPage("wiz_master")
+	form.SetInputCapture(escToPage("wizard"))
+	addPage("wiz_master", flex100(form), form)
+	goPage("wiz_master")
 }
 
 // runMasterInstall performs the full master bring-up and returns a step log.
-func runMasterInstall(cfg *config.MasterConfig) (string, error) {
+func runMasterInstall(cfg *config.MasterConfig, carrier string, ctrlPort int) (string, error) {
 	var log strings.Builder
 	step := func(s string) { log.WriteString("  ✓ " + s + "\n") }
 
@@ -113,16 +225,17 @@ func runMasterInstall(cfg *config.MasterConfig) (string, error) {
 	if err := saveMasterConfig(cfg); err != nil {
 		return log.String(), fmt.Errorf("write config: %w", err)
 	}
-	step("config written: " + masterCfgPath)
+	step(fmt.Sprintf("config written: %s (transport %s on %d)", masterCfgPath, carrier, ctrlPort))
 
-	// 3. Firewall: open control + data-plane ports. Ephemeral data-port range is
-	//    opened too (port-hopping assigns per-session data ports in that range).
+	// 3. Firewall: open the carrier control port + data-plane. The ephemeral
+	//    data-port range is opened too (port-hopping assigns per-session data
+	//    ports there — without it the client's uplink after handshake is dropped).
 	openFirewall([]string{
-		portOf(cfg.ListenUDP) + "/udp",
+		fmt.Sprintf("%d/udp", ctrlPort),
 		portOf(cfg.ListenDataPlane) + "/udp",
 		"32768-60999/udp",
 	}, []string{portOf(cfg.ListenControl) + "/tcp"})
-	step("firewall: control/data ports opened")
+	step("firewall: control/data + ephemeral range opened")
 
 	// 4. Enable + start.
 	if out, err := enableStart("mini-tun-asymmetric-master"); err != nil {
@@ -147,12 +260,15 @@ func wizardSlave() {
 	}
 	masterHost := tview.NewInputField().SetLabel("Master host (IP or domain)").SetFieldWidth(40)
 	tokenField := tview.NewInputField().SetLabel("Auth Token (base64)").SetFieldWidth(48)
+	cfg.Transport = "utp"
 
 	form := tview.NewForm()
 	form.AddFormItem(masterHost).
 		AddFormItem(tokenField).
 		AddInputField("Slave ID", cfg.SlaveID, 16, nil, func(v string) { cfg.SlaveID = v }).
-		AddInputField("Transport (utp/cs2/webrtc/quic)", "utp", 12, nil, func(v string) { cfg.Transport = v }).
+		AddDropDown("Transport (must match master)", carrierOrder, 0, func(opt string, _ int) {
+			cfg.Transport = opt
+		}).
 		AddButton("Install & Start", func() {
 			host := strings.TrimSpace(masterHost.GetText())
 			if host == "" {
@@ -175,13 +291,15 @@ func wizardSlave() {
 				showMessage("Setup failed", steps+"\n[red]"+err.Error()+"[-]")
 				return
 			}
-			showMessage("Slave ready", steps)
+			showMessage("Slave ready", steps+
+				"\n[gray]Transport "+cfg.Transport+" — must match the master's.[-]")
 		}).
-		AddButton("Cancel", func() { pages.SwitchToPage("wizard") })
+		AddButton("Cancel", func() { goPage("wizard") })
 
 	form.SetBorder(true).SetTitle(" Slave Quick Setup ").SetBorderColor(tcell.ColorDarkCyan)
-	pages.AddPage("wiz_slave", flex100(form), true, true)
-	pages.SwitchToPage("wiz_slave")
+	form.SetInputCapture(escToPage("wizard"))
+	addPage("wiz_slave", flex100(form), form)
+	goPage("wiz_slave")
 }
 
 func runSlaveInstall(cfg *config.SlaveConfig) (string, error) {

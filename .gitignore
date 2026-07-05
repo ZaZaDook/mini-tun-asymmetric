@@ -65,3 +65,7 @@ client-flutter/android/local.properties
 dist/flutter-app*/
 dist/mini-tun-asymmetric-agent.exe
 wireshark-filters.txt
+/dist/release/
+
+# User bug reports (screenshots may contain live IPs) — local only
+UserBugReport/
