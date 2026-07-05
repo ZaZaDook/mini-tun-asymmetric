@@ -227,6 +227,11 @@ func main() {
 		srv.uplinkMu.Lock()
 		delete(srv.uplinkAEADs, s.TunnelIP.String())
 		srv.uplinkMu.Unlock()
+		// Also drop the per-client decrypt cipher keyed by the client's UDP
+		// address, else clientCryptos grows by one AEAD per handshake forever.
+		if s.ClientAddr != nil {
+			srv.clientCryptos.Delete(s.ClientAddr.String())
+		}
 	}
 
 	// Build the set of control listeners. Each control port is bound to an
@@ -690,6 +695,12 @@ func (c *clientCryptoMap) Get(addr string) *crypto.AEAD {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.m[addr]
+}
+
+func (c *clientCryptoMap) Delete(addr string) {
+	c.mu.Lock()
+	delete(c.m, addr)
+	c.mu.Unlock()
 }
 
 // helloWindow is the maximum clock skew tolerated between a client's hello

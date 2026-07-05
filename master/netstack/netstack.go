@@ -141,9 +141,41 @@ func (ns *NetStack) outboundLoop() {
 	}
 }
 
+// egressForbidden reports whether the destination IP is one the master must
+// never proxy a client's tunneled connection to. Without this ACL the netstack
+// is an open proxy: an authenticated client could dial the master's own
+// loopback services, the cloud metadata endpoint (169.254.169.254), or hosts on
+// the master's private LAN — turning the tunnel into an SSRF pivot. We allow
+// only genuine public destinations.
+func egressForbidden(ip net.IP) bool {
+	if ip == nil {
+		return true
+	}
+	// Loopback (127/8, ::1), unspecified (0.0.0.0, ::), and all multicast.
+	if ip.IsLoopback() || ip.IsUnspecified() || ip.IsMulticast() {
+		return true
+	}
+	// Link-local unicast covers 169.254/16 (incl. cloud metadata 169.254.169.254)
+	// and fe80::/10.
+	if ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
+		return true
+	}
+	// RFC1918 (10/8, 172.16/12, 192.168/16) and IPv6 ULA (fc00::/7).
+	if ip.IsPrivate() {
+		return true
+	}
+	return false
+}
+
 func (ns *NetStack) handleTCP(r *tcp.ForwarderRequest) {
 	id := r.ID()
-	dst := net.JoinHostPort(net.IP(id.LocalAddress.AsSlice()).String(), fmt.Sprint(id.LocalPort))
+	dstIP := net.IP(id.LocalAddress.AsSlice())
+	if egressForbidden(dstIP) {
+		ns.logf("[netstack] tcp egress denied to %s", dstIP)
+		r.Complete(true) // send RST to client
+		return
+	}
+	dst := net.JoinHostPort(dstIP.String(), fmt.Sprint(id.LocalPort))
 
 	upstream, err := net.DialTimeout("tcp", dst, 10*time.Second)
 	if err != nil {
@@ -180,9 +212,18 @@ func (ns *NetStack) handleUDP(r *udp.ForwarderRequest) bool {
 	client := gonet.NewUDPConn(&wq, ep)
 
 	// In-tunnel DNS: answer queries to gateway:53 with our resolver instead of
-	// proxying to the (fake) destination the client packet carries.
+	// proxying to the (fake) destination the client packet carries. This is
+	// checked BEFORE the egress ACL because the gateway (10.8.0.1) is itself an
+	// RFC1918 address the ACL would otherwise reject.
 	if ns.dnsResolver != nil && id.LocalPort == 53 && dstIP.String() == ns.dnsAddr {
 		go ns.serveDNS(client)
+		return true
+	}
+
+	// Egress ACL: never proxy to loopback/link-local/private/metadata (SSRF).
+	if egressForbidden(dstIP) {
+		ns.logf("[netstack] udp egress denied to %s", dstIP)
+		client.Close()
 		return true
 	}
 

@@ -40,6 +40,9 @@ contextfile.txt
 FixUI.txt
 dist/vpndiag-out.txt
 HHHHHH*
+*reviewfable.txt
+beforereview*.txt
+afterreview*.txt
 
 # Agent / editor settings (whole dir)
 .claude/
