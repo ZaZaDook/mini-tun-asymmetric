@@ -1,0 +1,97 @@
+name: "🐞 Bug report / Баг-репорт"
+description: "Report a bug in Mini-Tun Asymmetric / Сообщить о баге"
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug. **Do not report security
+        vulnerabilities here** — see [SECURITY.md](../blob/main/SECURITY.md) and
+        use private reporting instead.
+
+        Спасибо, что нашли время сообщить о баге. **Не сообщайте здесь об
+        уязвимостях** — см. [SECURITY.md](../blob/main/SECURITY.md) и используйте
+        приватное репортирование.
+
+  - type: checkboxes
+    id: preconditions
+    attributes:
+      label: Preconditions / Предусловия
+      options:
+        - label: "This is not a security vulnerability (those go through private reporting). / Это не уязвимость (они идут через приватный репорт)."
+          required: true
+        - label: "I searched existing issues and didn't find a duplicate. / Я поискал(а) среди существующих issues и не нашёл(ла) дубликат."
+          required: true
+        - label: "I'm testing on throwaway / non-production hosts, per the README. / Я тестирую на одноразовых / не-боевых хостах, как в README."
+          required: true
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component / Компонент
+      description: Which part is affected? / Какая часть затронута?
+      options:
+        - master
+        - slave
+        - client (Windows / Flutter)
+        - client (Linux CLI)
+        - transport carrier (cs2 / utp / webrtc / quic)
+        - mta-setup / server-tui
+        - firewall (netfw)
+        - build / packaging
+        - other / другое
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version / commit / Версия / коммит
+      description: "Output of the binary's version, or the commit hash. / Версия бинарника или хэш коммита."
+      placeholder: "v0.1.3 or / или 390d394"
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: OS / environment / ОС / окружение
+      placeholder: "e.g. Ubuntu 24.04 server + Windows 11 client"
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened? / Что произошло?
+      description: A clear description of the bug and its impact. / Понятное описание бага и его последствий.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce / Шаги воспроизведения
+      description: How can we reproduce it? A minimal setup helps a lot. / Как это воспроизвести? Минимальная конфигурация очень помогает.
+      placeholder: |
+        1. …
+        2. …
+        3. …
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior / Ожидаемое поведение
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / Логи
+      description: Relevant logs or output. Redact tokens, keys, and IPs you don't want public. / Релевантные логи или вывод. Скройте токены, ключи и IP, которые не хотите светить.
+      render: text
+    validations:
+      required: false
