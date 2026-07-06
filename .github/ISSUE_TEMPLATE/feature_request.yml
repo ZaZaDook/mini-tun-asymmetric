@@ -1,0 +1,50 @@
+name: "💡 Feature request / Предложение фичи"
+description: "Suggest an idea or improvement / Предложить идею или улучшение"
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the idea! Remember this is an early-alpha research project —
+        the design changes fast, so big features are best discussed before code.
+
+        Спасибо за идею! Помните, это ранняя альфа и исследовательский проект —
+        дизайн быстро меняется, поэтому крупные фичи лучше обсудить до кода.
+
+  - type: checkboxes
+    id: preconditions
+    attributes:
+      label: Preconditions / Предусловия
+      options:
+        - label: "I searched existing issues and didn't find a duplicate. / Я поискал(а) среди существующих issues и не нашёл(ла) дубликат."
+          required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / Проблема
+      description: What problem does this solve? What are you trying to do? / Какую проблему это решает? Чего вы пытаетесь достичь?
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution / Предлагаемое решение
+      description: What would you like to happen? / Что вы хотели бы получить?
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered / Рассмотренные альтернативы
+    validations:
+      required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context / Дополнительный контекст
+    validations:
+      required: false

@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 🔒 Report a security vulnerability / Сообщить об уязвимости
+    url: https://github.com/ZaZaDook/mini-tun-asymmetric/security/advisories/new
+    about: "Please report security issues privately, not as a public issue. / Пожалуйста, сообщайте об уязвимостях приватно, а не публичным issue."
+  - name: 📖 Read the docs first / Сначала документация
+    url: https://github.com/ZaZaDook/mini-tun-asymmetric/blob/main/README.md
+    about: "Build, install, and architecture details are in the README. / Детали сборки, установки и архитектуры — в README."
